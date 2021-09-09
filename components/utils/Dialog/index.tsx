@@ -6,7 +6,7 @@ import {
 } from '@fluentui/react';
 import React from 'react';
 import { useBoolean } from '@fluentui/react-hooks';
-import { IDialogContentProps } from '@fluentui/react/src/components/Dialog/DialogContent.types';
+import { IDialogContentProps } from '@fluentui/react';
 
 const dialogStyles = { main: { maxWidth: 450 } };
 
