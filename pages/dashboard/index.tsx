@@ -258,7 +258,7 @@ const Dashboard: React.FunctionComponent = () => {
                 !!ModelLabel[text] ? (
                   <Label key={index}>{text}</Label>
                 ) : (
-                  <Text key={index} block variant="small">
+                  <Text key={index} block variant="medium">
                     {text}
                   </Text>
                 )
