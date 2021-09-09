@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '../../context/client';
-import styled, { keyframes } from 'styled-components';
+import styled from 'styled-components';
 import { Stats } from '../../services/client/type/stats';
 import {
   Text,
-  mergeStyles,
-  AnimationClassNames,
   Pivot,
   PivotItem,
   Label,
@@ -14,23 +12,12 @@ import {
   Spinner,
   ShimmeredDetailsList,
 } from '@fluentui/react';
-import { Theme } from '../../theme';
 import { useAsyncRetry } from 'react-use';
 import { isSuccess } from '../../services/client/interface';
 import { IColumn } from '@fluentui/react/src/components/DetailsList/DetailsList.types';
 
 const Root = styled.div``;
-const fadeIn = keyframes`
-  from {
-    transform: scale(0.25);
-    opacity: 0;
-  }
 
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-`;
 const Block = styled.div`
   max-width: 1024px;
   margin: 24px auto;
@@ -43,16 +30,6 @@ const Card = styled.div`
   border-radius: 0.5em;
   box-shadow: 2px 3px 7px 2px rgba(0, 0, 0, 0.02);
 `;
-
-const contentClass = mergeStyles([
-  {
-    backgroundColor: Theme.palette.themePrimary,
-    color: Theme.palette.white,
-    lineHeight: '50px',
-    padding: '0 20px',
-  },
-  AnimationClassNames.scaleUpIn100,
-]);
 
 type Row<T> = {
   dataIndex: string[] | string;
@@ -306,7 +283,5 @@ const Dashboard: React.FunctionComponent = () => {
     </Root>
   );
 };
-const labelStyles: Partial<IStyleSet<ILabelStyles>> = {
-  root: { marginTop: 10 },
-};
+
 export default Dashboard;
