@@ -15,6 +15,7 @@ import {
 import { useAsyncRetry } from 'react-use';
 import { isSuccess } from '../../services/client/interface';
 import { IColumn } from '@fluentui/react/src/components/DetailsList/DetailsList.types';
+import { useRouter } from 'next/router';
 
 const Root = styled.div``;
 
@@ -153,9 +154,12 @@ const PoliciesList = <T,>({
 const Dashboard: React.FunctionComponent = () => {
   const client = useClient();
   const [stats, setStats] = useState<Stats | undefined>();
+  const router = useRouter();
   useEffect(() => {
     if (client.clusterStats) {
       setStats(client.clusterStats);
+    } else {
+      router.replace('/');
     }
   }, [client]);
   const basicRows = useMemo(() => BasicRows(), []);
@@ -195,6 +199,7 @@ const Dashboard: React.FunctionComponent = () => {
     return await client.model(namespace);
   }, [namespace]);
 
+  if (!stats) return <></>;
   return (
     <Root>
       {namespaces.loading ? (
