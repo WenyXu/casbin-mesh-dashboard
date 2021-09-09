@@ -48,6 +48,7 @@ export default class MyDocument extends Document {
             // @ts-ignore
             dangerouslySetInnerHTML={{ __html: this.props.styleTags }}
           />
+          <title>Casbin Mesh Dashboard</title>
         </Head>
         <body>
           <Main />
