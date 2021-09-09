@@ -117,6 +117,14 @@ const RaftRows = (): Row<Stats>[] => {
   ];
 };
 
+const ModelLabel: Record<string, string> = {
+  '[request_definition]': '[request_definition]',
+  '[policy_definition]': '[policy_definition]',
+  '[role_definition]': '[role_definition]',
+  '[policy_effect]': '[policy_effect]',
+  '[matchers]': '[matchers]',
+};
+
 const onRenderItemColumn = (
   item?: any,
   index?: number,
@@ -246,11 +254,15 @@ const Dashboard: React.FunctionComponent = () => {
           <Card>
             <Text variant="xLarge">Model</Text>
             {isSuccess(model.value) &&
-              model?.value?.split('\n').map((text, index) => (
-                <Text key={index} block variant="small">
-                  {text}
-                </Text>
-              ))}
+              model?.value?.split('\n').map((text, index) =>
+                !!ModelLabel[text] ? (
+                  <Label key={index}>{text}</Label>
+                ) : (
+                  <Text key={index} block variant="small">
+                    {text}
+                  </Text>
+                )
+              )}
           </Card>
         </>
       )}
