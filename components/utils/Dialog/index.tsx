@@ -41,6 +41,7 @@ const useDialog = ({
     useBoolean(true);
 
   return [
+    // eslint-disable-next-line react/jsx-key
     <Dialog
       hidden={hideDialog}
       onDismiss={toggle}

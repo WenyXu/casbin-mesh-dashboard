@@ -159,7 +159,7 @@ const Dashboard: React.FunctionComponent = () => {
     } else {
       router.replace('/');
     }
-  }, [client]);
+  }, [client, router]);
   const basicRows = useMemo(() => BasicRows(), []);
   const raftRows = useMemo(() => RaftRows(), []);
   const nodesRows = useMemo(() => {
@@ -238,8 +238,8 @@ const Dashboard: React.FunctionComponent = () => {
           <Card>
             <Text variant="xLarge">Model</Text>
             {isSuccess(model.value) &&
-              model?.value?.split('\n').map((text) => (
-                <Text block variant="small">
+              model?.value?.split('\n').map((text, index) => (
+                <Text key={index} block variant="small">
                   {text}
                 </Text>
               ))}
