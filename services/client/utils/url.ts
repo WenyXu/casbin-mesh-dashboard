@@ -15,25 +15,31 @@ const defaultConnect: Partial<Connection> = {
   auth: { type: 'noop' },
 };
 
+const ErrInvalidConnectString = new Error('invalid connect string');
+
 // mesh://root:root@localhost:4002,root:root@localhost:4004?ssl=true&auth=basic
 // mesh://root:root@localhost:4002,root:root@localhost:4004
 // mesh://localhost:4003
 export const parseConnectString = (connect: string): Result<Connection> => {
   if (connect.startsWith(prefix)) {
     connect = connect.slice(prefix.length);
+    if (connect === '') {
+      return ErrInvalidConnectString;
+    }
     const result = connect.split('@');
     let username: string | undefined,
       password: string | undefined,
       authCred: string | undefined,
       urls: string | undefined;
-
     switch (result.length) {
       case 1:
         urls = result[0];
+        if (urls.indexOf(':') > -1) return ErrInvalidConnectString;
         break;
       case 2:
         authCred = result[0];
         urls = result[1];
+        if (urls === '') return ErrInvalidConnectString;
         break;
       default:
         return new Error('invalid connect string');
