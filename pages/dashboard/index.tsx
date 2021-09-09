@@ -7,7 +7,6 @@ import {
   Pivot,
   PivotItem,
   Label,
-  Spinner,
   ShimmeredDetailsList,
 } from '@fluentui/react';
 import { useAsyncRetry } from 'react-use';
@@ -23,11 +22,20 @@ const Block = styled.div`
 `;
 const Card = styled.div`
   max-width: 1024px;
-  margin: 24px auto;
+  margin: 48px auto;
   padding: 2em;
   background-color: #fdfdff;
   border-radius: 0.5em;
-  box-shadow: 2px 3px 7px 2px rgba(0, 0, 0, 0.02);
+  transition: 0.3s;
+  transition-property: all;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+  transition-delay: 0s;
+  box-shadow: 0 14px 80px rgb(34 35 58 / 20%);
+  &:hover {
+    transform: translateY(2px);
+    box-shadow: rgba(0, 0, 0, 0.12) 0px 4px 20px 0px;
+  }
 `;
 
 type Row<T> = {
@@ -201,7 +209,7 @@ const Dashboard: React.FunctionComponent = () => {
   return (
     <Root>
       {namespaces.loading ? (
-        <Spinner label={'loading'} labelPosition="left" />
+        <></>
       ) : (
         <Block>
           <Pivot
