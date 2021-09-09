@@ -7,14 +7,12 @@ import {
   Pivot,
   PivotItem,
   Label,
-  IStyleSet,
-  ILabelStyles,
   Spinner,
   ShimmeredDetailsList,
 } from '@fluentui/react';
 import { useAsyncRetry } from 'react-use';
 import { isSuccess } from '../../services/client/interface';
-import { IColumn } from '@fluentui/react/src/components/DetailsList/DetailsList.types';
+import { IColumn } from '@fluentui/react';
 import { useRouter } from 'next/router';
 
 const Root = styled.div``;
