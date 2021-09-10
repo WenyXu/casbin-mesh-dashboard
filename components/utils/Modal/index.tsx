@@ -36,6 +36,7 @@ const useModal = (
       isOpen={isOpen}
       onDismiss={autoDismiss ? toggle : undefined}
       headerText={headerText}
+      hasCloseButton={false}
       onRenderFooterContent={() => (
         <div>
           {okButton && (
