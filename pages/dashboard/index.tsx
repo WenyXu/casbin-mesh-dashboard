@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClient } from '../../context/client';
 import styled from 'styled-components';
 import { Stats } from '../../services/client/type/stats';
@@ -8,11 +8,21 @@ import {
   PivotItem,
   Label,
   ShimmeredDetailsList,
+  Link,
+  TextField,
+  IDetailsListProps,
+  IDetailsRowStyles,
+  DetailsRow,
+  Selection,
+  PrimaryButton,
+  DefaultButton,
 } from '@fluentui/react';
 import { useAsyncRetry } from 'react-use';
-import { isSuccess } from '../../services/client/interface';
+import { isSuccess, isError, Result } from '../../services/client/interface';
 import { IColumn } from '@fluentui/react';
 import { useRouter } from 'next/router';
+import useModal from '../../components/utils/Modal';
+import FieldWrap from '../../components/utils/Field';
 
 const Root = styled.div``;
 
@@ -125,43 +135,173 @@ const ModelLabel: Record<string, string> = {
   '[matchers]': '[matchers]',
 };
 
+const _onRenderRow: IDetailsListProps['onRenderRow'] = (props) => {
+  const customStyles: Partial<IDetailsRowStyles> = { cell: { height: 50 } };
+  if (props) {
+    return <DetailsRow {...props} styles={customStyles} />;
+  }
+  return null;
+};
+
+const Space = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
 const onRenderItemColumn = (
-  item?: any,
+  item?: ProcessedPolicy,
   index?: number,
   column?: IColumn
 ): React.ReactNode => {
-  return item[column?.key ?? ''];
+  switch (column?.key) {
+    case 'type':
+      return item?.type ?? 'unknown type';
+    case 'value':
+      return item?.value.join(',') ?? 'unknown type';
+    case 'modified':
+      return !!item?.modified ? 'draft' : 'latest';
+    case 'operation':
+      return (
+        <>
+          <Link onClick={() => item?.onEdit?.()}>Edit</Link>
+        </>
+      );
+    default:
+      // @ts-ignore
+      return item?.[column?.key ?? ''] ?? 'unknown';
+  }
 };
+
+type ProcessedPolicy = {
+  rawKey: string;
+  rawValue: string;
+  type?: string;
+  value: string[];
+  modified: boolean;
+  editing: boolean;
+  onEdit?: () => void;
+};
+
+const processPolicies = (policies: string[][]): Result<ProcessedPolicy[]> => {
+  return policies.map(([rawKey, rawValue]) => {
+    const value = rawKey.split('::');
+    return {
+      rawKey: rawKey,
+      rawValue: rawValue,
+      modified: false,
+      value: value,
+      type: value[0] === 'p' ? 'Policy' : 'Group',
+      editing: false,
+    };
+  });
+};
+
+const ActionWrap = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 1em;
+`;
+
 const PoliciesList = <T,>({
   items,
   loading,
 }: {
-  items?: T[];
+  items?: ProcessedPolicy[];
   loading: boolean;
 }) => {
+  const [prefix, setPrefix] = useState<string | undefined>();
+  const [count, setCount] = useState(0);
+  const updatable = useMemo(
+    () => !!items && items.find((item) => item?.modified),
+    [items]
+  );
+  const onSelectionChange = () => {
+    console.log(selection.getSelection());
+    setCount(selection.getSelection().length);
+  };
+  const selection = useMemo(
+    () =>
+      new Selection({
+        onSelectionChanged: () => onSelectionChange(),
+      }),
+    []
+  );
   return (
-    <ShimmeredDetailsList
-      setKey="hoverSet"
-      items={items ?? []}
-      enableShimmer={loading}
-      columns={[
-        {
-          key: 'key',
-          name: 'Key',
-          minWidth: 100,
-          maxWidth: 200,
-          isResizable: true,
-        },
-        {
-          key: 'value',
-          name: 'Value',
-          minWidth: 100,
-          maxWidth: 200,
-          isResizable: true,
-        },
-      ]}
-      onRenderItemColumn={onRenderItemColumn}
-    />
+    <>
+      {/*<Announced message={selectionDetails} />*/}
+
+      <ActionWrap
+        style={{
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <Text variant="xLarge">Policies</Text>
+        <ActionWrap>
+          {!!count && (
+            <DefaultButton>Delete selected {count} policies</DefaultButton>
+          )}
+          {updatable && <DefaultButton>Update policies</DefaultButton>}
+          <PrimaryButton>New policies</PrimaryButton>
+        </ActionWrap>
+      </ActionWrap>
+
+      <TextField
+        label="Filter by key:"
+        onChange={(ev, value) => setPrefix(value)}
+      />
+      <ShimmeredDetailsList
+        setKey="hoverSet"
+        selectionPreservedOnEmptyClick
+        selection={selection}
+        items={
+          (items &&
+            (prefix
+              ? items.filter((item) => item.rawKey.indexOf(prefix) > -1)
+              : items)) ??
+          []
+        }
+        enableShimmer={loading}
+        columns={[
+          {
+            key: 'rawKey',
+            name: 'key',
+            minWidth: 50,
+            maxWidth: 200,
+            isResizable: true,
+          },
+          {
+            key: 'type',
+            name: 'type',
+            minWidth: 50,
+            maxWidth: 200,
+            isResizable: true,
+          },
+          {
+            key: 'value',
+            name: 'value',
+            minWidth: 50,
+            maxWidth: 200,
+            isResizable: true,
+          },
+          {
+            key: 'operation',
+            name: 'operation',
+            minWidth: 50,
+            maxWidth: 200,
+            isResizable: true,
+          },
+          {
+            key: 'modified',
+            name: 'state',
+            minWidth: 50,
+            maxWidth: 200,
+            isResizable: true,
+          },
+        ]}
+        onRenderItemColumn={onRenderItemColumn}
+      />
+    </>
   );
 };
 
@@ -197,14 +337,65 @@ const Dashboard: React.FunctionComponent = () => {
     return result;
   }, [client]);
   const [namespace, setNamespace] = useState<string>();
-
+  const [policiesState, setPolicies] = useState<ProcessedPolicy[]>([]);
   const policies = useAsyncRetry(async () => {
     if (!client || !namespace) {
       console.log('empty client or namespace', namespace);
       return;
     }
-    return await client.policies(namespace);
+    const rawPolicies = await client.policies(namespace);
+    if (isError(rawPolicies)) {
+      throw rawPolicies;
+    } else {
+      const processPoliciesData = processPolicies(rawPolicies);
+      if (isSuccess(processPoliciesData)) {
+        setPolicies(processPoliciesData);
+      }
+      return processPolicies(rawPolicies);
+    }
   }, [namespace]);
+
+  const [editingPolicy, setEditingPolicy] = useState<ProcessedPolicy>();
+  const [dialog, { toggle }] = useModal(
+    () => {
+      return (
+        <>
+          <TextField
+            value={editingPolicy?.value.join(',')}
+            onChange={(ev, value) => {
+              value &&
+                editingPolicy &&
+                setEditingPolicy({ ...editingPolicy, value: value.split('.') });
+            }}
+          />
+        </>
+      );
+    },
+    {
+      headerText: 'Edit',
+      okButton: {
+        label:
+          editingPolicy &&
+          editingPolicy.value.join('::') === editingPolicy.rawKey
+            ? 'Close'
+            : 'Save as DRAFT',
+        onClick: ({ toggle }) => {
+          toggle();
+          if (!editingPolicy) return;
+          setPolicies((prev) => {
+            const hit = prev.find((p) => p.rawKey === editingPolicy?.rawKey);
+            if (hit) {
+              const raw =
+                editingPolicy.value.join('::') === editingPolicy.rawKey;
+              hit.value = editingPolicy.value;
+              hit.modified = !raw;
+            }
+            return [...prev];
+          });
+        },
+      },
+    }
+  );
   const model = useAsyncRetry(async () => {
     if (!client || !namespace) {
       console.log('empty client or namespace', namespace);
@@ -216,6 +407,7 @@ const Dashboard: React.FunctionComponent = () => {
   if (!stats) return <></>;
   return (
     <Root>
+      {dialog}
       {namespaces.loading ? (
         <></>
       ) : (
@@ -234,16 +426,17 @@ const Dashboard: React.FunctionComponent = () => {
           </Pivot>
         </Block>
       )}
-      <Card style={{ padding: '5px' }}>
+      <Card>
         {isSuccess(policies.value) && (
-          <PoliciesList<Record<'key' | 'value', string>>
+          <PoliciesList<ProcessedPolicy>
             loading={policies.loading}
-            items={
-              policies.value?.map((p) => ({
-                key: p[0],
-                value: p[1],
-              })) ?? []
-            }
+            items={policiesState?.map((v) => ({
+              ...v,
+              onEdit: () => {
+                setEditingPolicy(v);
+                toggle();
+              },
+            }))}
           />
         )}
       </Card>
@@ -252,7 +445,15 @@ const Dashboard: React.FunctionComponent = () => {
       ) : (
         <>
           <Card>
-            <Text variant="xLarge">Model</Text>
+            <ActionWrap
+              style={{
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text variant="xLarge">Model</Text>
+              <DefaultButton>Edit model</DefaultButton>
+            </ActionWrap>
             {isSuccess(model.value) &&
               model?.value?.split('\n').map((text, index) =>
                 !!ModelLabel[text] ? (
