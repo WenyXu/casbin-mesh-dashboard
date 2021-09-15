@@ -3,6 +3,7 @@ import ky from 'ky';
 import { parseURL } from './utils/url';
 import { Author } from './utils/auth';
 import { Stats } from './type/stats';
+import { MutationPoliciesResponse } from './type';
 
 const withSchema = (ssh: boolean, url: string) => {
   return ssh ? 'https://' : 'http://' + url;
@@ -59,6 +60,55 @@ export class Client {
         method: 'post',
         json: { ns: ns },
       }).json<string[][]>();
+    } catch (e) {
+      console.error(e);
+      return new Error('failed to request server');
+    }
+  }
+  async addPolicies(
+    ns: string,
+    sec: string,
+    ptype: string,
+    rules: string[][]
+  ): Promise<Result<MutationPoliciesResponse>> {
+    try {
+      return await this.request('add/policies', {
+        method: 'post',
+        json: { ns: ns, sec, ptype, rules },
+      }).json<MutationPoliciesResponse>();
+    } catch (e) {
+      console.error(e);
+      return new Error('failed to request server');
+    }
+  }
+  async updatePolicies(
+    ns: string,
+    sec: string,
+    ptype: string,
+    newRules: string[][],
+    oldRules: string[][]
+  ): Promise<Result<MutationPoliciesResponse>> {
+    try {
+      return await this.request('update/policies', {
+        method: 'post',
+        json: { ns: ns, sec, ptype, newRules, oldRules },
+      }).json<MutationPoliciesResponse>();
+    } catch (e) {
+      console.error(e);
+      return new Error('failed to request server');
+    }
+  }
+  async removePolicies(
+    ns: string,
+    sec: string,
+    ptype: string,
+    rules: string[][]
+  ): Promise<Result<MutationPoliciesResponse>> {
+    try {
+      return await this.request('remove/policies', {
+        method: 'post',
+        json: { ns: ns, sec, ptype, rules },
+      }).json<MutationPoliciesResponse>();
     } catch (e) {
       console.error(e);
       return new Error('failed to request server');
