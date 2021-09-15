@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '../../context/client';
 import styled from 'styled-components';
 import { Stats } from '../../services/client/type/stats';
@@ -22,7 +22,8 @@ import { isSuccess, isError, Result } from '../../services/client/interface';
 import { IColumn } from '@fluentui/react';
 import { useRouter } from 'next/router';
 import useModal from '../../components/utils/Modal';
-import FieldWrap from '../../components/utils/Field';
+import PolicyMutationModal from '../../components/PolicyModal';
+import { ProcessedPolicy } from '../../interface';
 
 const Root = styled.div``;
 
@@ -172,16 +173,6 @@ const onRenderItemColumn = (
   }
 };
 
-type ProcessedPolicy = {
-  rawKey: string;
-  rawValue: string;
-  type?: string;
-  value: string[];
-  modified: boolean;
-  editing: boolean;
-  onEdit?: () => void;
-};
-
 const processPolicies = (policies: string[][]): Result<ProcessedPolicy[]> => {
   return policies.map(([rawKey, rawValue]) => {
     const value = rawKey.split('::');
@@ -202,12 +193,18 @@ const ActionWrap = styled.div`
   gap: 1em;
 `;
 
+const ContentWrap = styled.div`
+  margin-top: 8px;
+`;
+
 const PoliciesList = <T,>({
   items,
   loading,
+  newPolicies,
 }: {
   items?: ProcessedPolicy[];
   loading: boolean;
+  newPolicies: () => void;
 }) => {
   const [prefix, setPrefix] = useState<string | undefined>();
   const [count, setCount] = useState(0);
@@ -229,7 +226,6 @@ const PoliciesList = <T,>({
   return (
     <>
       {/*<Announced message={selectionDetails} />*/}
-
       <ActionWrap
         style={{
           justifyContent: 'space-between',
@@ -242,7 +238,7 @@ const PoliciesList = <T,>({
             <DefaultButton>Delete selected {count} policies</DefaultButton>
           )}
           {updatable && <DefaultButton>Update policies</DefaultButton>}
-          <PrimaryButton>New policies</PrimaryButton>
+          <PrimaryButton onClick={newPolicies}>New policies</PrimaryButton>
         </ActionWrap>
       </ActionWrap>
 
@@ -354,12 +350,11 @@ const Dashboard: React.FunctionComponent = () => {
       return processPolicies(rawPolicies);
     }
   }, [namespace]);
-
   const [editingPolicy, setEditingPolicy] = useState<ProcessedPolicy>();
-  const [dialog, { toggle }] = useModal(
+  const [editPolicyDialog, { toggle: editPolicyDialogToggle }] = useModal(
     () => {
       return (
-        <>
+        <ContentWrap>
           <TextField
             value={editingPolicy?.value.join(',')}
             onChange={(ev, value) => {
@@ -368,17 +363,13 @@ const Dashboard: React.FunctionComponent = () => {
                 setEditingPolicy({ ...editingPolicy, value: value.split('.') });
             }}
           />
-        </>
+        </ContentWrap>
       );
     },
     {
-      headerText: 'Edit',
+      headerText: 'Edit Policy',
       okButton: {
-        label:
-          editingPolicy &&
-          editingPolicy.value.join('::') === editingPolicy.rawKey
-            ? 'Close'
-            : 'Save as DRAFT',
+        label: 'Save as DRAFT',
         onClick: ({ toggle }) => {
           toggle();
           if (!editingPolicy) return;
@@ -394,6 +385,10 @@ const Dashboard: React.FunctionComponent = () => {
           });
         },
       },
+      cancelButton: {
+        label: 'Close',
+        onClick: ({ toggle }) => toggle(),
+      },
     }
   );
   const model = useAsyncRetry(async () => {
@@ -403,11 +398,41 @@ const Dashboard: React.FunctionComponent = () => {
     }
     return await client.model(namespace);
   }, [namespace]);
+  const [newPolicyModal, { toggle: newPolicyModalToggle }] =
+    PolicyMutationModal({
+      onFinish: async (value) => {
+        if (!namespace) {
+          return;
+        }
+        const sec = value[0].value.slice(0, 1);
+        const ptype = value[0].value.split(',')[0];
+        const rules = value.map((v) => {
+          const [_, ...rest] = v.value.split(',');
+          return rest;
+        });
+        const result = await client.addPolicies(namespace, sec, ptype, rules);
+        if (isSuccess(result)) {
+          const { effected_rules } = result;
+          const newRule = effected_rules?.map((rule) => [ptype, ...rule]) ?? [];
+          console.log('newRule:', newRule);
+          const processed = processPolicies(
+            newRule.map((rule) => [rule.join('::'), JSON.stringify(rule)])
+          );
+          console.log('processed:', processed);
 
+          if (isError(processed)) {
+            return;
+          }
+          setPolicies((prev) => [...prev, ...processed]);
+          newPolicyModalToggle();
+        }
+      },
+    });
   if (!stats) return <></>;
   return (
     <Root>
-      {dialog}
+      {newPolicyModal}
+      {editPolicyDialog}
       {namespaces.loading ? (
         <></>
       ) : (
@@ -429,12 +454,13 @@ const Dashboard: React.FunctionComponent = () => {
       <Card>
         {isSuccess(policies.value) && (
           <PoliciesList<ProcessedPolicy>
+            newPolicies={newPolicyModalToggle}
             loading={policies.loading}
             items={policiesState?.map((v) => ({
               ...v,
               onEdit: () => {
                 setEditingPolicy(v);
-                toggle();
+                editPolicyDialogToggle();
               },
             }))}
           />
