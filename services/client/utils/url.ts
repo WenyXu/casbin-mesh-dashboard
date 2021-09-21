@@ -34,7 +34,6 @@ export const parseConnectString = (connect: string): Result<Connection> => {
     switch (result.length) {
       case 1:
         urls = result[0];
-        if (urls.indexOf(':') > -1) return ErrInvalidConnectString;
         break;
       case 2:
         authCred = result[0];
@@ -42,7 +41,7 @@ export const parseConnectString = (connect: string): Result<Connection> => {
         if (urls === '') return ErrInvalidConnectString;
         break;
       default:
-        return new Error('invalid connect string');
+        return ErrInvalidConnectString;
     }
     let [url, query] = urls.split('?');
     const urlList = url.split(',');
@@ -86,6 +85,7 @@ export const parseConnectString = (connect: string): Result<Connection> => {
       },
     };
   } else {
-    return new Error('invalid connect string');
+    console.log('last');
+    return ErrInvalidConnectString;
   }
 };
