@@ -114,4 +114,26 @@ export class Client {
       return new Error('failed to request server');
     }
   }
+  async createNamespace(ns: string): Promise<Result<void>> {
+    try {
+      return await this.request('create/namespace', {
+        method: 'post',
+        json: { ns: ns },
+      }).json<void>();
+    } catch (e) {
+      console.error(e);
+      return new Error('failed to request server');
+    }
+  }
+  async setModal(ns: string, model: string) {
+    try {
+      return await this.request('set/model', {
+        method: 'post',
+        json: { ns: ns, text: model },
+      }).json<void>();
+    } catch (e) {
+      console.error(e);
+      return new Error('failed to request server');
+    }
+  }
 }
