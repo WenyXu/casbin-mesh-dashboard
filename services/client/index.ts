@@ -54,7 +54,7 @@ export class Client {
       return new Error('failed to request server');
     }
   }
-  async policies(ns: string): Promise<Result<string[][]>> {
+  async policies(ns: string): Promise<Result<string[][] | null>> {
     try {
       return await this.request('list/policies', {
         method: 'post',
