@@ -3,6 +3,7 @@ import useModal from '../utils/Modal';
 import styled from 'styled-components';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { DefaultButton, Link, TextField } from '@fluentui/react';
+import ContentWrap from '../utils/Content';
 
 type onClickFn = ({
   hide,
@@ -14,10 +15,6 @@ type ButtonProps = {
   onClick?: onClickFn;
   label?: string;
 };
-
-const ContentWrap = styled.div`
-  margin-top: 8px;
-`;
 
 const PolicyMutationModal = ({
   onFinish,
