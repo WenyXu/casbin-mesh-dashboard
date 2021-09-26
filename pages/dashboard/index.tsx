@@ -31,6 +31,7 @@ import {
   ProcessUpdateRules,
 } from '../../services/client/utils/rule';
 import ModelModal from '../../components/ModelModal';
+import UpdateModelModal from '../../components/ModelModal/update';
 
 const Root = styled.div``;
 
@@ -517,9 +518,20 @@ const Dashboard: React.FunctionComponent = () => {
       toggleNewModelModal();
     },
   });
+  const [
+    updateModelModal,
+    { toggle: toggleUpdateModelModal, setValue: setUpdateModelValue },
+  ] = UpdateModelModal({
+    onFinish: async ({ model: text }) => {
+      if (!namespace) return;
+      await client.setModal(namespace, text);
+      model.retry();
+    },
+  });
   if (!stats) return <></>;
   return (
     <Root>
+      {updateModelModal}
       {modelModal}
       {newPolicyModal}
       {editPolicyDialog}
@@ -579,7 +591,14 @@ const Dashboard: React.FunctionComponent = () => {
               }}
             >
               <Text variant="xLarge">Model</Text>
-              <DefaultButton>Edit model</DefaultButton>
+              <DefaultButton
+                onClick={() => {
+                  toggleUpdateModelModal();
+                  setUpdateModelValue('model', model.value);
+                }}
+              >
+                Edit model
+              </DefaultButton>
             </ActionWrap>
             {isSuccess(model.value) &&
               model?.value?.split('\n').map((text, index) =>
