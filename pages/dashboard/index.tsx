@@ -30,6 +30,7 @@ import {
   ProcessRemoveRules,
   ProcessUpdateRules,
 } from '../../services/client/utils/rule';
+import ModelModal from '../../components/ModelModal';
 
 const Root = styled.div``;
 
@@ -370,6 +371,10 @@ const Dashboard: React.FunctionComponent = () => {
       return;
     }
     const rawPolicies = await client.policies(namespace);
+    if (!rawPolicies) {
+      setPolicies([]);
+      return;
+    }
     if (isError(rawPolicies)) {
       throw rawPolicies;
     } else {
@@ -379,7 +384,7 @@ const Dashboard: React.FunctionComponent = () => {
       }
       return processPolicies(rawPolicies);
     }
-  }, [namespace]);
+  }, [namespace, setPolicies]);
 
   const [editingPolicy, setEditingPolicy] = useState<ProcessedPolicy>();
 
@@ -504,10 +509,18 @@ const Dashboard: React.FunctionComponent = () => {
     },
     [namespace, setPolicies]
   );
-
+  const [modelModal, { toggle: toggleNewModelModal }] = ModelModal({
+    onFinish: async ({ namespace, model }) => {
+      await client.createNamespace(namespace);
+      await client.setModal(namespace, model);
+      await namespaces.retry();
+      toggleNewModelModal();
+    },
+  });
   if (!stats) return <></>;
   return (
     <Root>
+      {modelModal}
       {newPolicyModal}
       {editPolicyDialog}
       {namespaces.loading ? (
@@ -532,7 +545,7 @@ const Dashboard: React.FunctionComponent = () => {
                   <PivotItem headerText={ns} key={ns} itemKey={ns} />
                 ))}
             </Pivot>
-            <PrimaryButton>New</PrimaryButton>
+            <PrimaryButton onClick={toggleNewModelModal}>New</PrimaryButton>
           </ActionWrap>
         </Block>
       )}
