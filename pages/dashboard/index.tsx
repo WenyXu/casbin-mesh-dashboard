@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClient } from '../../context/client';
 import styled from 'styled-components';
 import { Stats } from '../../services/client/type/stats';
@@ -16,14 +16,20 @@ import {
   Selection,
   PrimaryButton,
   DefaultButton,
+  CommandBarButton,
+  Button,
 } from '@fluentui/react';
-import { useAsyncRetry } from 'react-use';
+import { useAsyncFn, useAsyncRetry } from 'react-use';
 import { isSuccess, isError, Result } from '../../services/client/interface';
 import { IColumn } from '@fluentui/react';
 import { useRouter } from 'next/router';
 import useModal from '../../components/utils/Modal';
 import PolicyMutationModal from '../../components/PolicyModal';
 import { ProcessedPolicy } from '../../interface';
+import {
+  ProcessRemoveRules,
+  ProcessUpdateRules,
+} from '../../services/client/utils/rule';
 
 const Root = styled.div``;
 
@@ -31,6 +37,7 @@ const Block = styled.div`
   max-width: 1024px;
   margin: 24px auto;
 `;
+
 const Card = styled.div`
   max-width: 1024px;
   margin: 48px auto;
@@ -201,10 +208,18 @@ const PoliciesList = <T,>({
   items,
   loading,
   newPolicies,
+  onUpdate,
+  onUpdating,
+  onDelete,
+  onDeleting,
 }: {
   items?: ProcessedPolicy[];
   loading: boolean;
   newPolicies: () => void;
+  onUpdating?: boolean;
+  onUpdate?: () => Promise<void> | void;
+  onDeleting?: boolean;
+  onDelete?: (rawKey: string[][]) => Promise<void> | void;
 }) => {
   const [prefix, setPrefix] = useState<string | undefined>();
   const [count, setCount] = useState(0);
@@ -212,20 +227,21 @@ const PoliciesList = <T,>({
     () => !!items && items.find((item) => item?.modified),
     [items]
   );
+  const [selected, setSelected] = useState<string[][]>([]);
   const onSelectionChange = () => {
-    console.log(selection.getSelection());
+    setSelected(selection.getSelection().map((r) => r?.rawKey?.split('::')));
     setCount(selection.getSelection().length);
   };
   const selection = useMemo(
     () =>
-      new Selection({
+      new Selection<any>({
         onSelectionChanged: () => onSelectionChange(),
       }),
     []
   );
+
   return (
     <>
-      {/*<Announced message={selectionDetails} />*/}
       <ActionWrap
         style={{
           justifyContent: 'space-between',
@@ -235,9 +251,13 @@ const PoliciesList = <T,>({
         <Text variant="xLarge">Policies</Text>
         <ActionWrap>
           {!!count && (
-            <DefaultButton>Delete selected {count} policies</DefaultButton>
+            <DefaultButton onClick={() => onDelete?.(selected)}>
+              Delete selected {count} policies
+            </DefaultButton>
           )}
-          {updatable && <DefaultButton>Update policies</DefaultButton>}
+          {updatable && (
+            <DefaultButton onClick={onUpdate}>Update policies</DefaultButton>
+          )}
           <PrimaryButton onClick={newPolicies}>New policies</PrimaryButton>
         </ActionWrap>
       </ActionWrap>
@@ -303,8 +323,11 @@ const PoliciesList = <T,>({
 
 const Dashboard: React.FunctionComponent = () => {
   const client = useClient();
+
   const [stats, setStats] = useState<Stats | undefined>();
+
   const router = useRouter();
+
   useEffect(() => {
     if (client.clusterStats) {
       setStats(client.clusterStats);
@@ -312,8 +335,11 @@ const Dashboard: React.FunctionComponent = () => {
       router.replace('/');
     }
   }, [client, router]);
+
   const basicRows = useMemo(() => BasicRows(), []);
+
   const raftRows = useMemo(() => RaftRows(), []);
+
   const nodesRows = useMemo(() => {
     return stats?.nodes?.map((n) => ({
       dataIndex: ['nodes', n.id, 'addr'],
@@ -321,6 +347,7 @@ const Dashboard: React.FunctionComponent = () => {
       title: n.id,
     }));
   }, [stats]);
+
   const namespaces = useAsyncRetry(async () => {
     if (!client) {
       console.log('empty client');
@@ -332,8 +359,11 @@ const Dashboard: React.FunctionComponent = () => {
     }
     return result;
   }, [client]);
+
   const [namespace, setNamespace] = useState<string>();
+
   const [policiesState, setPolicies] = useState<ProcessedPolicy[]>([]);
+
   const policies = useAsyncRetry(async () => {
     if (!client || !namespace) {
       console.log('empty client or namespace', namespace);
@@ -350,7 +380,9 @@ const Dashboard: React.FunctionComponent = () => {
       return processPolicies(rawPolicies);
     }
   }, [namespace]);
+
   const [editingPolicy, setEditingPolicy] = useState<ProcessedPolicy>();
+
   const [editPolicyDialog, { toggle: editPolicyDialogToggle }] = useModal(
     () => {
       return (
@@ -360,7 +392,7 @@ const Dashboard: React.FunctionComponent = () => {
             onChange={(ev, value) => {
               value &&
                 editingPolicy &&
-                setEditingPolicy({ ...editingPolicy, value: value.split('.') });
+                setEditingPolicy({ ...editingPolicy, value: value.split(',') });
             }}
           />
         </ContentWrap>
@@ -391,6 +423,7 @@ const Dashboard: React.FunctionComponent = () => {
       },
     }
   );
+
   const model = useAsyncRetry(async () => {
     if (!client || !namespace) {
       console.log('empty client or namespace', namespace);
@@ -398,10 +431,14 @@ const Dashboard: React.FunctionComponent = () => {
     }
     return await client.model(namespace);
   }, [namespace]);
+
   const [newPolicyModal, { toggle: newPolicyModalToggle }] =
     PolicyMutationModal({
       onFinish: async (value) => {
         if (!namespace) {
+          return;
+        }
+        if (!value[0]) {
           return;
         }
         const sec = value[0].value.slice(0, 1);
@@ -428,6 +465,46 @@ const Dashboard: React.FunctionComponent = () => {
         }
       },
     });
+
+  const [updatePoliciesState, updatePolicies] = useAsyncFn(
+    async (namespace: string, p: ProcessedPolicy[]) => {
+      const updateData = ProcessUpdateRules(p);
+      console.log('before update', p);
+      updateData.forEach(({ sec, pType, newRules, oldRules }) => {
+        console.log('updating', sec, pType, newRules, oldRules);
+        client.updatePolicies(namespace, sec, pType, newRules, oldRules);
+      });
+    },
+    [client]
+  );
+
+  const updatePoliciesFn = useCallback(async () => {
+    const needUpdate = policiesState.filter((p) => p.modified);
+    if (!namespace) return;
+    await updatePolicies(namespace, needUpdate);
+    setPolicies(policiesState.map((r) => ({ ...r, modified: false })));
+  }, [namespace, policiesState, setPolicies]);
+
+  const [deletePoliciesState, deletePolicies] = useAsyncFn(
+    async (namespace: string, rawRules: string[][]) => {
+      const deleteData = ProcessRemoveRules(rawRules);
+      deleteData.forEach(({ sec, pType, rules }) => {
+        client.removePolicies(namespace, sec, pType, rules);
+      });
+    },
+    [client]
+  );
+
+  const deletePoliciesFn = useCallback(
+    async (rawRules: string[][]) => {
+      if (!namespace) return;
+      await deletePolicies(namespace, rawRules);
+      const rawKey = rawRules.map((r) => r.join('::'));
+      setPolicies((pp) => pp.filter((p) => !(rawKey.indexOf(p.rawKey) > -1)));
+    },
+    [namespace, setPolicies]
+  );
+
   if (!stats) return <></>;
   return (
     <Root>
@@ -437,18 +514,26 @@ const Dashboard: React.FunctionComponent = () => {
         <></>
       ) : (
         <Block>
-          <Pivot
-            overflowBehavior="menu"
-            headersOnly
-            onLinkClick={(item) => {
-              setNamespace(item?.props?.itemKey);
+          <ActionWrap
+            style={{
+              justifyContent: 'space-between',
+              alignItems: 'end',
             }}
           >
-            {isSuccess(namespaces?.value) &&
-              namespaces.value?.map((ns) => (
-                <PivotItem headerText={ns} key={ns} itemKey={ns} />
-              ))}
-          </Pivot>
+            <Pivot
+              overflowBehavior="menu"
+              headersOnly
+              onLinkClick={(item) => {
+                setNamespace(item?.props?.itemKey);
+              }}
+            >
+              {isSuccess(namespaces?.value) &&
+                namespaces.value?.map((ns) => (
+                  <PivotItem headerText={ns} key={ns} itemKey={ns} />
+                ))}
+            </Pivot>
+            <PrimaryButton>New</PrimaryButton>
+          </ActionWrap>
         </Block>
       )}
       <Card>
@@ -456,6 +541,9 @@ const Dashboard: React.FunctionComponent = () => {
           <PoliciesList<ProcessedPolicy>
             newPolicies={newPolicyModalToggle}
             loading={policies.loading}
+            onUpdate={updatePoliciesFn}
+            onUpdating={updatePoliciesState.loading}
+            onDelete={deletePoliciesFn}
             items={policiesState?.map((v) => ({
               ...v,
               onEdit: () => {
